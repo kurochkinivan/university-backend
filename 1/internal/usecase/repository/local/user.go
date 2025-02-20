@@ -19,6 +19,13 @@ func NewUserRepository(storage *LocalStorage) *UserRepository {
 	}
 }
 
+func (r *UserRepository) Exists(ctx context.Context, userID int) bool {
+	if _, ok := r.storage.users[userID]; !ok {
+		return false
+	}
+	return true
+}
+
 func (r *UserRepository) GetAll(ctx context.Context) ([]*entity.User, error) {
 	var users []*entity.User
 	for _, u := range r.storage.users {
@@ -57,4 +64,32 @@ func (r *UserRepository) Update(ctx context.Context, userID int, user *entity.Us
 	r.storage.users[userID] = user
 
 	return r.storage.users[userID], nil
+}
+
+func (r *UserRepository) Patch(ctx context.Context, userID int, user *entity.User) (*entity.User, error) {
+	exists := r.Exists(ctx, userID)
+	if !exists {
+		return nil, repository.ErrNotFound
+	}
+
+	curUser := r.storage.users[userID]
+	if user.Name != "" {
+		curUser.Name = user.Name
+	}
+	if user.Phone != "" {
+		curUser.Phone = user.Phone
+	}
+	if user.Birthday != "" {
+		curUser.Birthday = user.Birthday
+	}
+	if user.Email != "" {
+		curUser.Email = user.Email
+	}
+	if user.Username != "" {
+		curUser.Username = user.Username
+	}
+
+	r.storage.users[userID] = curUser
+
+	return curUser, nil
 }

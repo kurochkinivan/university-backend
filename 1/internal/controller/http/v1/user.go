@@ -17,6 +17,7 @@ type UserUseCase interface {
 	Create(ctx context.Context, user *entity.User) (*entity.User, error)
 	Delete(ctx context.Context, userID int) error
 	Update(ctx context.Context, userID int, user *entity.User) (*entity.User, error)
+	Patch(ctx context.Context, userID int, user *entity.User) (*entity.User, error)
 }
 
 type UserHandler struct {
@@ -29,12 +30,13 @@ func NewUserHandler(u UserUseCase) Handler {
 	}
 }
 
-func (c *UserHandler) Register(r *httprouter.Router) {
-	r.GET("/v1/users-query", c.getUsersQuery)
-	r.GET("/v1/users-header", c.getUsersHeader)
-	r.POST("/v1/users", c.createUser)
-	r.DELETE("/v1/users/:id", c.deleteUser)
-	r.PUT("/v1/users/:id", c.updateUser)
+func (h *UserHandler) Register(r *httprouter.Router) {
+	r.GET("/v1/users-query", h.getUsersQuery)
+	r.GET("/v1/users-header", h.getUsersHeader)
+	r.POST("/v1/users", h.createUser)
+	r.DELETE("/v1/users/:id", h.deleteUser)
+	r.PUT("/v1/users/:id", h.updateUser)
+	r.PATCH("/v1/users/:id", h.patchUser)
 }
 
 type (
@@ -51,8 +53,8 @@ func mapUsersToGetUsersResp(users []*entity.User) getUsersResponse {
 	}
 }
 
-func (c *UserHandler) getUsersQuery(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	users, err := c.u.GetAll(r.Context())
+func (h *UserHandler) getUsersQuery(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	users, err := h.u.GetAll(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -80,8 +82,8 @@ func (c *UserHandler) getUsersQuery(w http.ResponseWriter, r *http.Request, p ht
 	w.Write(resp)
 }
 
-func (c *UserHandler) getUsersHeader(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	users, err := c.u.GetAll(r.Context())
+func (h *UserHandler) getUsersHeader(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	users, err := h.u.GetAll(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -117,15 +119,6 @@ type (
 		Email    string `json:"email"`
 		Username string `json:"username"`
 	}
-
-	createUserResponse struct {
-		ID       int    `json:"id"`
-		Name     string `json:"name"`
-		Phone    string `json:"phone"`
-		Birthday string `json:"birthday"`
-		Email    string `json:"email"`
-		Username string `json:"username"`
-	}
 )
 
 func mapCreateUserReqToUser(req createUserRequest) *entity.User {
@@ -138,18 +131,7 @@ func mapCreateUserReqToUser(req createUserRequest) *entity.User {
 	}
 }
 
-func mapUserToCreateUserResp(user *entity.User) createUserResponse {
-	return createUserResponse{
-		ID:       user.ID,
-		Name:     user.Name,
-		Phone:    user.Phone,
-		Birthday: user.Birthday,
-		Email:    user.Email,
-		Username: user.Username,
-	}
-}
-
-func (c *UserHandler) createUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	var req createUserRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -157,13 +139,13 @@ func (c *UserHandler) createUser(w http.ResponseWriter, r *http.Request, p httpr
 	}
 	defer r.Body.Close()
 
-	user, err := c.u.Create(r.Context(), mapCreateUserReqToUser(req))
+	user, err := h.u.Create(r.Context(), mapCreateUserReqToUser(req))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to create user, err: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	resp, err := json.Marshal(mapUserToCreateUserResp(user))
+	resp, err := json.Marshal(user)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to serialize data, err: %v", err), http.StatusInternalServerError)
 		return
@@ -174,14 +156,14 @@ func (c *UserHandler) createUser(w http.ResponseWriter, r *http.Request, p httpr
 	w.Write(resp)
 }
 
-func (c *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func (h *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	userID, err := strconv.Atoi(p.ByName("id"))
 	if err != nil {
 		http.Error(w, "invalid user id, must be a numeric value", http.StatusBadRequest)
 		return
 	}
 
-	err = c.u.Delete(r.Context(), userID)
+	err = h.u.Delete(r.Context(), userID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("faield to delete user, err: %v", err), http.StatusInternalServerError)
 		return
@@ -210,7 +192,7 @@ func mapUpdateUserReqToUser(req updateUserRequest) *entity.User {
 	}
 }
 
-func (c *UserHandler) updateUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func (h *UserHandler) updateUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	w.Header().Set("Content-Type", "application/json")
 
 	userID, err := strconv.Atoi(p.ByName("id"))
@@ -226,9 +208,65 @@ func (c *UserHandler) updateUser(w http.ResponseWriter, r *http.Request, p httpr
 		return
 	}
 
-	user, err := c.u.Update(r.Context(), userID, mapUpdateUserReqToUser(req))
+	if req.Name == "" || req.Phone == "" || req.Birthday == "" || req.Username == "" || req.Email == "" {
+		http.Error(w, "not all fields were provided", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.u.Update(r.Context(), userID, mapUpdateUserReqToUser(req))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to update user, err: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := json.Marshal(user)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to serialize data, err: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(resp)
+}
+
+type (
+	pathUserRequest struct {
+		Name     string `json:"name"`
+		Phone    string `json:"phone"`
+		Birthday string `json:"birthday"`
+		Email    string `json:"email"`
+		Username string `json:"username"`
+	}
+)
+
+func mapPatchUserRequestToUser(req pathUserRequest) *entity.User {
+	return &entity.User{
+		Name:     req.Name,
+		Phone:    req.Phone,
+		Birthday: req.Birthday,
+		Email:    req.Email,
+		Username: req.Username,
+	}
+}
+
+func (h *UserHandler) patchUser(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	w.Header().Set("Content-Type", "application/json")
+
+	userID, err := strconv.Atoi(p.ByName("id"))
+	if err != nil {
+		http.Error(w, "invalid user id, must be a numeric value", http.StatusBadRequest)
+		return
+	}
+
+	var req pathUserRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "failed to desirialize data", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.u.Patch(r.Context(), userID, mapPatchUserRequestToUser(req))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to patch user, err: %v", err), http.StatusInternalServerError)
 		return
 	}
 

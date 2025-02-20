@@ -14,6 +14,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *entity.User) (*entity.User, error)
 	Delete(ctx context.Context, userID int) error
 	Update(ctx context.Context, userID int, user *entity.User) (*entity.User, error)
+	Patch(ctx context.Context, userID int, user *entity.User) (*entity.User, error)
 }
 
 type UserUseCase struct {
@@ -70,4 +71,11 @@ func (u *UserUseCase) Update(ctx context.Context, userID int, user *entity.User)
 	return nil, fmt.Errorf("failed to update user: %w", err)
 }
 
-func (u UserUseCase) Patch(ctx context.Context, userID int, user *entity.User) (*entity.User, error)
+func (u UserUseCase) Patch(ctx context.Context, userID int, user *entity.User) (*entity.User, error) {
+	user, err := u.repo.Patch(ctx, userID, user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to patch user, err: %v", err)
+	}
+	
+	return user, nil
+}
