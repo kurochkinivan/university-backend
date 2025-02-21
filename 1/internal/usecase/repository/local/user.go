@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"errors"
 	"sort"
 
 	"github.com/kurochkinivan/university-backend-1/internal/entity"
@@ -20,7 +19,7 @@ func NewUserRepository(storage *LocalStorage) *UserRepository {
 }
 
 func (r *UserRepository) Exists(ctx context.Context, userID int) bool {
-	if _, ok := r.storage.users[userID]; !ok {
+	if _, ok := r.storage.users.Load(userID); !ok {
 		return false
 	}
 	return true
@@ -28,9 +27,10 @@ func (r *UserRepository) Exists(ctx context.Context, userID int) bool {
 
 func (r *UserRepository) GetAll(ctx context.Context) ([]*entity.User, error) {
 	var users []*entity.User
-	for _, u := range r.storage.users {
-		users = append(users, u)
-	}
+	r.storage.users.Range(func(_, u any) bool {
+		users = append(users, u.(*entity.User))
+		return true
+	})
 
 	sort.Slice(users, func(i, j int) bool {
 		return users[i].ID < users[j].ID
@@ -42,28 +42,28 @@ func (r *UserRepository) GetAll(ctx context.Context) ([]*entity.User, error) {
 func (r *UserRepository) Create(ctx context.Context, user *entity.User) (*entity.User, error) {
 	r.storage.lastID++
 	user.ID = r.storage.lastID
-	r.storage.users[user.ID] = user
+	r.storage.users.Store(user.ID, user)
 	return user, nil
 }
 
 func (r *UserRepository) Delete(ctx context.Context, userID int) error {
-	if _, ok := r.storage.users[userID]; !ok {
-		return errors.New("user with provided ID was no found")
+	if !r.Exists(ctx, userID) {
+		return repository.ErrNotFound
 	}
 
-	delete(r.storage.users, userID)
+	r.storage.users.Delete(userID)
 	return nil
 }
 
 func (r *UserRepository) Update(ctx context.Context, userID int, user *entity.User) (*entity.User, error) {
-	if _, ok := r.storage.users[userID]; !ok {
+	if !r.Exists(ctx, userID) {
 		return nil, repository.ErrNotFound
 	}
 
 	user.ID = userID
-	r.storage.users[userID] = user
+	r.storage.users.Store(userID, user)
 
-	return r.storage.users[userID], nil
+	return user, nil
 }
 
 func (r *UserRepository) Patch(ctx context.Context, userID int, user *entity.User) (*entity.User, error) {
@@ -72,7 +72,9 @@ func (r *UserRepository) Patch(ctx context.Context, userID int, user *entity.Use
 		return nil, repository.ErrNotFound
 	}
 
-	curUser := r.storage.users[userID]
+	u, _ := r.storage.users.Load(userID)
+	curUser := u.(*entity.User)
+
 	if user.Name != "" {
 		curUser.Name = user.Name
 	}
@@ -89,7 +91,7 @@ func (r *UserRepository) Patch(ctx context.Context, userID int, user *entity.Use
 		curUser.Username = user.Username
 	}
 
-	r.storage.users[userID] = curUser
+	r.storage.users.Store(userID, curUser)
 
 	return curUser, nil
 }
