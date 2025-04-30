@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Список статей{% endblock title %}
+{% block header %}Список статей{% endblock header %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Список статей</h1>
+    <a href="{% url 'article.create' %}" class="btn btn-primary">Создать статью</a>
+</div>
+
+{% include "includes/search_form.html" %}
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    {% for article in articles %}
+    <div class="col">
+        {% include "includes/article_card.html" %}
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info">Статьи не найдены</div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock content %}
