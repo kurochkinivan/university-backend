@@ -6,12 +6,12 @@ from django.db.models import Q
 from django_project import settings
 from .models import Article, Tag, Category
 from django.http import HttpResponseRedirect, FileResponse
+from django.core.paginator import Paginator
 from .forms import ArticleForm
 import os
 
 
 def get_articles_queryset(request):
-    """Общая функция для получения отфильтрованных статей"""
     articles = Article.objects.all()
     search_query = request.GET.get('q', '')
     category_id = request.GET.get('category', '')
@@ -28,38 +28,37 @@ def get_articles_queryset(request):
     return articles
 
 
+def paginate_articles(request, articles_queryset, per_page=2, additional_context=None):
+    paginator = Paginator(articles_queryset, per_page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "articles": page_obj,
+        "page_obj": page_obj,
+        "categories": Category.objects.all(),
+        "current_q": request.GET.get('q', ''),
+        "current_category": request.GET.get('category', ''),
+    }
+
+    if additional_context:
+        context.update(additional_context)
+
+    return render(request, 'articles/index.html', context)
+
 def articles(request):
     articles = get_articles_queryset(request)
-    categories = Category.objects.all() 
-
-    return render(request, 'articles/index.html', {
-        "articles": articles,
-        "categories": categories,
-        "search_query": request.GET.get('q', ''),
-        "selected_category": request.GET.get('category', ''),
-    })
-
+    return paginate_articles(request, articles)
 
 def articles_by_tag(request, tag_slug):
     tag = get_object_or_404(Tag, slug=tag_slug)
     articles = Article.objects.filter(tags=tag)
-    categories = Category.objects.all()  # Добавляем категории
-    
-    return render(request, 'articles/index.html', {
-        "articles": articles,
-        "categories": categories
-    })
-
+    return paginate_articles(request, articles, additional_context={"tag": tag})
 
 def articles_by_category(request, category_slug):
     category = get_object_or_404(Category, slug=category_slug)
     articles = Article.objects.filter(category=category)
-    categories = Category.objects.all()  # Добавляем категории
-    
-    return render(request, 'articles/index.html', {
-        "articles": articles,
-        "categories": categories
-    })
+    return paginate_articles(request, articles, additional_context={"current_category": category})
 
 
 def article_detail(request, slug):
