@@ -1,15 +1,35 @@
 from django.urls import path
-from . import views
+from .views import (
+    ArticleListView,
+    ArticleDetailView,
+    ArticleCreateView,
+    ArticleUpdateView,
+    ArticleDeleteView,
+    FileDownloadView,
+    ArticleArchiveView,
+    ArticleRestoreView,
+    ArticleForceDeleteView,
+    ArticleByTagView,
+    ArticleByCategoryView,
+    page_not_found
+)
 
 urlpatterns = [
-    path('', views.articles, name="article.index"), 
-    path('create/', views.article_create, name="article.create"),
-    path('update/<int:article_id>/', views.article_update, name="article.update"),
-    path('remove/<int:article_id>/', views.article_delete, name="article.delete"),
-    path('file-download/', views.file_download, name="article.file_download"),
-
-    path('tag/<slug:tag_slug>/', views.articles_by_tag, name="article.tag"),
-    path('category/<slug:category_slug>/', views.articles_by_category, name="article.category"),
+    path('', ArticleListView.as_view(), name="article.index"),
     
-    path('<slug:slug>/', views.article_detail, name='article.detail'),
+    path('create/', ArticleCreateView.as_view(), name="article.create"),
+    path('update/<int:article_id>/', ArticleUpdateView.as_view(), name="article.update"), 
+    path('remove/<int:article_id>/', ArticleDeleteView.as_view(), name="article.delete"),
+    path('file-download/', FileDownloadView.as_view(), name="article.file_download"),
+
+    path('archive/', ArticleArchiveView.as_view(), name='article.archive'),
+    path('<int:pk>/restore/', ArticleRestoreView.as_view(), name='article.restore'),
+    path('<int:pk>/force-delete/', ArticleForceDeleteView.as_view(), name='article.force_delete'),
+
+    path('tag/<slug:tag_slug>/', ArticleByTagView.as_view(), name="article.tag"),
+    path('category/<slug:category_slug>/', ArticleByCategoryView.as_view(), name="article.category"),
+    
+    path('<slug:slug>/', ArticleDetailView.as_view(), name='article.detail'),
 ]
+
+handler404 = page_not_found

@@ -43,14 +43,14 @@
                 <div class="d-flex gap-2"> <!-- Группа кнопок действий -->
                     <a href="{% url 'article.update' article.id %}"
                         class="btn btn-sm btn-outline-secondary d-flex align-items-center px-3" title="Редактировать">
-                        ✏️
+                        <i class="bi bi-pencil-square"></i>
                     </a>
 
                     <form method="POST" action="{% url 'article.delete' article.id %}" class="d-flex">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center px-3"
                             title="Удалить" onclick="return confirm('Вы уверены?')"> <!-- Подтверждение удаления -->
-                            🗑️
+                            <i class="bi bi-trash"></i>
                         </button>
                     </form>
                 </div>

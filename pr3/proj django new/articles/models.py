@@ -73,3 +73,19 @@ class Article(TimeStampModel, SlugModel, SoftDeleteModel):
 
     def __str__(self):
         return self.name
+    
+    def hard_delete(self):
+    # Сохраняем имя файла перед удалением
+        image_name = self.featured_image.name if self.featured_image else None
+    
+    # Полное удаление записи из БД
+        super(SoftDeleteModel, self).delete()
+    
+    # Удаляем файл изображения после удаления записи
+        if image_name and image_name != "default.jpg":
+            try:
+                storage = self.featured_image.storage
+                if storage.exists(image_name):
+                    storage.delete(image_name)
+            except Exception as e:
+               print(f"Ошибка при удалении файла {image_name}: {e}")

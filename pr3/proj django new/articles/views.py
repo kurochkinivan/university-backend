@@ -1,112 +1,147 @@
-from django.shortcuts import render, get_object_or_404
-from django.contrib import messages
-from django.urls import reverse
+from django.shortcuts import get_object_or_404, render, redirect
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
+from django.urls import reverse_lazy, reverse
 from django.db.models import Q
-
-from django_project import settings
-from .models import Article, Tag, Category
 from django.http import HttpResponseRedirect, FileResponse
-from django.core.paginator import Paginator
+from django.contrib import messages
+from django_project import settings
+import os 
+
+from .models import Article, Tag, Category
 from .forms import ArticleForm
-import os
 
+class ArticleListView(ListView):
+    model = Article
+    template_name = 'articles/index.html'
+    context_object_name = 'articles'
+    paginate_by = 2
 
-def get_articles_queryset(request):
-    articles = Article.objects.all()
-    search_query = request.GET.get('q', '')
-    category_id = request.GET.get('category', '')
+    def get_queryset(self):
+        queryset = Article.objects.all()
+        search_query = self.request.GET.get('q', '')
+        category_id = self.request.GET.get('category', '')
 
-    if search_query:
-        articles = articles.filter(
-            Q(name__icontains=search_query) | 
-            Q(content__icontains=search_query) |
-            Q(excerpt__icontains=search_query))
+        if search_query:
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) |
+                Q(context__icontains=search_query) |
+                Q(excerpt__icontains=search_query) 
+            )
+        
+        if category_id:
+            queryset = queryset.filter(category__id=category_id)
+
+        return queryset
     
-    if category_id:
-        articles = articles.filter(category__id=category_id)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['categories'] = Category.objects.all()
+        context['current_q'] = self.request.GET.get('q', '')
+        context['current_category'] = self.request.GET.get('category', '')
+        return context
     
-    return articles
+class ArticleByTagView(ArticleListView):
+    def get_queryset(self):
+        self.tag = get_object_or_404(Tag, slug=self.kwargs['tag_slug'])
+        return super().get_queryset().filter(tags=self.tag)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['tag'] = self.tag
+        return context
 
-def paginate_articles(request, articles_queryset, per_page=2, additional_context=None):
-    paginator = Paginator(articles_queryset, per_page)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+class ArticleByCategoryView(ArticleListView):
+    def get_queryset(self):
+        self.category = get_object_or_404(Category, slug=self.kwargs['category_slug'])
+        return super().get_queryset().filter(category=self.category)
 
-    context = {
-        "articles": page_obj,
-        "page_obj": page_obj,
-        "categories": Category.objects.all(),
-        "current_q": request.GET.get('q', ''),
-        "current_category": request.GET.get('category', ''),
-    }
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['current_category'] = self.category
+        return context
 
-    if additional_context:
-        context.update(additional_context)
+class ArticleDetailView(DetailView):
+    model = Article
+    template_name = 'articles/detail.html'
+    slug_field = 'slug'
+    context_object_name = 'article'
 
-    return render(request, 'articles/index.html', context)
+class ArticleCreateView(CreateView):
+    model = Article 
+    form_class = ArticleForm
+    template_name = 'articles/create.html'
 
-def articles(request):
-    articles = get_articles_queryset(request)
-    return paginate_articles(request, articles)
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, 'Статья успешно создана!')
+        return response
+    
+    def get_success_url(self):
+        return reverse('article.index')
+    
+class ArticleUpdateView(UpdateView):
+    model = Article 
+    form_class = ArticleForm
+    template_name = 'articles/update.html'
+    pk_url_kwarg = 'article_id'
 
-def articles_by_tag(request, tag_slug):
-    tag = get_object_or_404(Tag, slug=tag_slug)
-    articles = Article.objects.filter(tags=tag)
-    return paginate_articles(request, articles, additional_context={"tag": tag})
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['article'] = self.get_object()
+        return context
+    
+    def get_success_url(self):
+        return reverse('article.update', args=(self.kwargs['article_id'],))
+    
+class ArticleDeleteView(DeleteView):
+    model = Article
+    pk_url_kwarg = 'article_id'
 
-def articles_by_category(request, category_slug):
-    category = get_object_or_404(Category, slug=category_slug)
-    articles = Article.objects.filter(category=category)
-    return paginate_articles(request, articles, additional_context={"current_category": category})
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.object.delete()
+        return HttpResponseRedirect(self.get_success_url())
+    
+    def get_success_url(self):
+        return reverse('article.index')
 
+class ArticleArchiveView(ListView):
+    model = Article
+    template_name = 'articles/archive.html'
+    context_object_name = 'articles'
 
-def article_detail(request, slug):
-    article = get_object_or_404(Article, slug=slug)
-    return render(request, 'articles/detail.html', {'article': article})
+    def get_queryset(self):
+        return Article.all_objects.filter(is_active=False)
 
+class ArticleRestoreView(View):
+    def post(self, request, pk):
+        article = get_object_or_404(Article.all_objects, pk=pk)
+        article.is_active = True
+        article.save()
+        messages.success(request, f'Статья "{article.name}" восстановлена!')
+        return HttpResponseRedirect(reverse('article.archive'))
 
-def article_create(request):
-    if request.method == 'POST':
-        article_form = ArticleForm(request.POST, request.FILES)
-        if article_form.is_valid():
-            article_form.save()
-            messages.success(request, "Статья успешно создана!")
-            return HttpResponseRedirect(reverse('article.index'))
-    else:
-        article_form = ArticleForm()
-    return render(request, 'articles/create.html', {'article_form': article_form})
-
-
-def article_update(request, article_id):
-    article = get_object_or_404(Article, pk=article_id)
-
-    if request.method == 'POST':
-        article_form = ArticleForm(request.POST, request.FILES, instance=article)
-        if article_form.is_valid():
-            article_form.save()
-            return HttpResponseRedirect(reverse('article.update', args=(article_id,)))
-    else:
-        article_form = ArticleForm(instance=article)
-    return render(request, 'articles/update.html', {
-        "article_form": article_form,
-        "article": article
-    })
-
-
-def article_delete(request, article_id):
-    if request.method == 'POST':
-        article = Article.objects.get(id=article_id)
-        article.delete()
-        return HttpResponseRedirect(reverse('article.index'))
-    return HttpResponseRedirect(reverse('article.index'))
-
-
-def file_download(request):
-    file_path = os.path.join(settings.MEDIA_ROOT, 'sample.pdf')
-    response = FileResponse(open(file_path, 'rb'))
-    response['Content-Disposition'] = 'attachment; filename="document.pdf"'
-    return response
+class ArticleForceDeleteView(View):
+    def post(self, request, pk):
+        try:
+            article = Article.all_objects.get(pk=pk)
+            article_name = article.name
+            article.hard_delete()
+            messages.success(request, f'Статья "{article_name}" полностью удалена!')
+            return redirect('article.archive')
+        except Article.DoesNotExist:
+            messages.error(request, "Статья не найдена")
+            return redirect('article.archive')
+        except Exception as e:
+            messages.error(request, f"Ошибка при удалении: {str(e)}")
+            return redirect('article.archive')
+    
+class FileDownloadView(View):
+    def get(self, request):
+        file_path = os.path.join(settings.MEDIA_ROOT, 'sample.pdf')
+        response = FileResponse(open(file_path, 'rb'))
+        response['Content-Disposition'] = 'attachment; filename="document.pdf"'
+        return response
 
 def page_not_found(request, exception):
     return render(request, 'articles/404.html', status=404)
