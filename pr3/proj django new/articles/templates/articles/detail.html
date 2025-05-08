@@ -4,17 +4,37 @@
 {% block header %}{{ form.media }}{{ article.name }}{% endblock header %}
 
 {% block content %}
-<div class="card">
-    <img src="{{ article.featured_image.url }}" class="card-img-top" alt="{{ article.name }}">
-    <div class="card-body">
-        <h5 class="card-title">{{ article.name }}</h5>
-        <p class="card-text">{{ article.content|safe }}</p>
-        <p>Категория: {{ article.category.name }}</p>
-        <p>Теги:
-            {% for tag in article.tags.all %}
-            <span class="badge bg-secondary">{{ tag.name }}</span>
-            {% endfor %}
-        </p>
+<div class="container py-4">  <!-- Добавлен контейнер с вертикальными отступами -->
+    <div class="card p-3">  <!-- Добавлен padding для карточки -->
+        {% if article.featured_image %}
+        <img src="{{ article.featured_image.url }}" class="card-img-top" alt="{{ article.name }}">
+        {% endif %}
+        <div class="card-body p-4">  <!-- Увеличен padding внутри карточки -->
+            <h1 class="card-title mb-4">{{ article.name }}</h1>  <!-- Добавлен отступ снизу -->
+            <div class="article-content mb-4">  <!-- Контейнер для контента с отступом -->
+                {{ article.content|safe }}
+            </div>
+            <div class="article-meta mt-4 pt-4 border-top">  <!-- Мета-информация с отступом сверху и границей -->
+                <p class="mb-2"><strong>Категория:</strong> {{ article.category.name }}</p>
+                <p class="mb-0"><strong>Теги:</strong>
+                    {% for tag in article.tags.all %}
+                    <span class="badge bg-secondary me-1">{{ tag.name }}</span>  <!-- Добавлен отступ между тегами -->
+                    {% endfor %}
+                </p>
+            </div>
+        </div>
     </div>
 </div>
+
+<style>
+    /* Дополнительные стили для лучшего отображения контента */
+    .article-content p {
+        margin-bottom: 1rem;
+    }
+    .article-content img {
+        max-width: 100%;
+        height: auto;
+        margin: 1rem 0;
+    }
+</style>
 {% endblock content %}
