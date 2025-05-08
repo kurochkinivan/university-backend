@@ -14,10 +14,10 @@ class ArticleListView(ListView):
     model = Article
     template_name = 'articles/index.html'
     context_object_name = 'articles'
-    paginate_by = 2
+    paginate_by = 9
 
     def get_queryset(self):
-        queryset = Article.objects.all()
+        queryset = Article.objects.select_related('category').prefetch_related('tags')
         search_query = self.request.GET.get('q', '')
         category_id = self.request.GET.get('category', '')
 

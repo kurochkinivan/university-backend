@@ -2,6 +2,7 @@ from django.db import models
 from slugify import slugify
 from django_ckeditor_5.fields import CKEditor5Field
 from django.utils.html import strip_tags 
+from django.urls import reverse
 
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
@@ -66,16 +67,6 @@ class Article(TimeStampModel, SlugModel, SoftDeleteModel):
 
     class Meta:
         ordering = ['-created_at']
-
-    def save(self, *args, **kwargs):
-        if not self.excerpt and self.content:
-            plaint_text = strip_tags(self.content)
-            self.excerpt = plaint_text[:min(100, len(plaint_text))] + '...'
-            
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.name
     
     def hard_delete(self):
         image_name = self.featured_image.name if self.featured_image else None
@@ -87,3 +78,16 @@ class Article(TimeStampModel, SlugModel, SoftDeleteModel):
                     storage.delete(image_name)
             except Exception as e:
                print(f"Ошибка при удалении файла {image_name}: {e}")
+
+    def get_absolute_url(self):
+        return reverse('article.detail', args=[self.slug])
+    
+    def save(self, *args, **kwargs):
+        if not self.excerpt and self.content:
+            plaint_text = strip_tags(self.content)
+            self.excerpt = plaint_text[:min(100, len(plaint_text))] + '...'
+            
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name

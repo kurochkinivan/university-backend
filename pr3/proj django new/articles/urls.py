@@ -1,4 +1,7 @@
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
+from articles.sitemaps import ArticleSitemap
+from django.contrib.sitemaps.views import sitemap
 from .views import (
     ArticleListView,
     ArticleDetailView,
@@ -13,6 +16,10 @@ from .views import (
     ArticleByCategoryView,
     page_not_found
 )
+
+sitemaps = {
+    'articles': ArticleSitemap,
+}
 
 urlpatterns = [
     path('', ArticleListView.as_view(), name="article.index"),
@@ -30,6 +37,14 @@ urlpatterns = [
     path('category/<slug:category_slug>/', ArticleByCategoryView.as_view(), name="article.category"),
     
     path('<slug:slug>/', ArticleDetailView.as_view(), name='article.detail'),
+
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
 ]
 
 handler404 = page_not_found
+
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns
