@@ -6,7 +6,7 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-{{ article_form.media }}
+{{ form.media }}
 
 {% if article.featured_image %}
 <img src="{{ article.featured_image.url}}" alt="">
@@ -14,7 +14,7 @@
 
 <form method="POST" action="" novalidate enctype="multipart/form-data">
      {% csrf_token %}
-    {{article_form|crispy}}
+    {{form|crispy}}
 
     <button class="btn btn-primary">Обновить</button>
 </form>

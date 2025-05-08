@@ -5,11 +5,11 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-{{ article_form.media }}
+{{ form.media }}
 
 <form method="POST" novalidate enctype="multipart/form-data">
      {% csrf_token %}
-    {{article_form|crispy}}
+    {{ form|crispy }}
 
     <button class="btn btn-primary">Создать</button>
 </form>

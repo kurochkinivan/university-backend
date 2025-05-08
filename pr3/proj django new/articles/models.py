@@ -64,6 +64,9 @@ class Article(TimeStampModel, SlugModel, SoftDeleteModel):
     tags = models.ManyToManyField(Tag, verbose_name="Теги")
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, verbose_name="Категория")
 
+    class Meta:
+        ordering = ['-created_at']
+
     def save(self, *args, **kwargs):
         if not self.excerpt and self.content:
             plaint_text = strip_tags(self.content)
@@ -75,13 +78,8 @@ class Article(TimeStampModel, SlugModel, SoftDeleteModel):
         return self.name
     
     def hard_delete(self):
-    # Сохраняем имя файла перед удалением
         image_name = self.featured_image.name if self.featured_image else None
-    
-    # Полное удаление записи из БД
         super(SoftDeleteModel, self).delete()
-    
-    # Удаляем файл изображения после удаления записи
         if image_name and image_name != "default.jpg":
             try:
                 storage = self.featured_image.storage
