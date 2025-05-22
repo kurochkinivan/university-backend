@@ -51,8 +51,6 @@ class Article(models.Model):
             plaint_text = strip_tags(self.content)
             self.excerpt = plaint_text[:min(100, len(plaint_text))] + '...'
 
-        print(self.slug)
-
         super(Article, self).save(*args, **kwargs)
 
     def __str__(self):
