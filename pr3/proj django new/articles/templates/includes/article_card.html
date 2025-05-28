@@ -40,6 +40,7 @@
                 </a>
                 {% endif %}
 
+                {% if user.is_authenticated and article.author == user %}
                 <div class="d-flex gap-2"> <!-- Группа кнопок действий -->
                     <a href="{% url 'article.update' article.id %}"
                         class="btn btn-sm btn-outline-secondary d-flex align-items-center px-3" title="Редактировать">
@@ -54,6 +55,7 @@
                         </button>
                     </form>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>

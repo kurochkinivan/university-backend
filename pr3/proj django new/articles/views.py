@@ -1,11 +1,13 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.db.models import Q
 from django.http import HttpResponseRedirect, FileResponse
 from django.contrib import messages
 from django_project import settings
 import os 
+from django.views.generic.detail import SingleObjectMixin
 
 from .models import Article, Tag, Category
 from .forms import ArticleForm
@@ -66,20 +68,20 @@ class ArticleDetailView(DetailView):
     slug_field = 'slug'
     context_object_name = 'article'
 
-class ArticleCreateView(CreateView):
+class ArticleCreateView(LoginRequiredMixin, CreateView):
     model = Article 
     form_class = ArticleForm
     template_name = 'articles/create.html'
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        messages.success(self.request, 'Статья успешно создана!')
-        return response
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
     
     def get_success_url(self):
         return reverse('article.index')
     
-class ArticleUpdateView(UpdateView):
+class ArticleUpdateView(LoginRequiredMixin, UpdateView):
     model = Article 
     form_class = ArticleForm
     template_name = 'articles/update.html'
@@ -93,7 +95,14 @@ class ArticleUpdateView(UpdateView):
     def get_success_url(self):
         return reverse('article.update', args=(self.kwargs['article_id'],))
     
-class ArticleDeleteView(DeleteView):
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user:
+            messages.error(request, "Вы не являетесь автором этой статьи.")
+            return redirect('article.index')
+        return super().dispatch(request, *args, **kwargs)
+    
+class ArticleDeleteView(LoginRequiredMixin, DeleteView):
     model = Article
     pk_url_kwarg = 'article_id'
 
@@ -104,6 +113,13 @@ class ArticleDeleteView(DeleteView):
     
     def get_success_url(self):
         return reverse('article.index')
+    
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user:
+            messages.error(request, "Вы не являетесь автором этой статьи.")
+            return redirect('article.index')
+        return super().dispatch(request, *args, **kwargs)    
 
 class ArticleArchiveView(ListView):
     model = Article
@@ -113,18 +129,41 @@ class ArticleArchiveView(ListView):
     def get_queryset(self):
         return Article.all_objects.filter(is_active=False)
 
-class ArticleRestoreView(View):
+class ArticleRestoreView(SingleObjectMixin, LoginRequiredMixin, View):
+    model = Article
+    queryset = Article.all_objects
+
     def post(self, request, pk):
-        article = get_object_or_404(Article.all_objects, pk=pk)
+        article = self.get_object()
+        if article.author != request.user:
+            messages.error(request, "Вы не автор этой статьи.")
+            return redirect('article.archive')
+        
         article.is_active = True
         article.save()
         messages.success(request, f'Статья "{article.name}" восстановлена!')
         return HttpResponseRedirect(reverse('article.archive'))
 
-class ArticleForceDeleteView(View):
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user:
+            messages.error(request, "Вы не являетесь автором этой статьи.")
+            return redirect('article.index')
+        return super().dispatch(request, *args, **kwargs)
+
+class ArticleForceDeleteView(SingleObjectMixin, LoginRequiredMixin, View):
+    model = Article 
+    queryset = Article.all_objects 
+
+    def post(self, request, pk):
+        article = self.get_object()
     def post(self, request, pk):
         try:
             article = Article.all_objects.get(pk=pk)
+            if article.author != request.user:
+                messages.error(request, "Вы не автор этой статьи.")
+                return redirect('article.archive')
+            
             article_name = article.name
             article.hard_delete()
             messages.success(request, f'Статья "{article_name}" полностью удалена!')
@@ -135,7 +174,14 @@ class ArticleForceDeleteView(View):
         except Exception as e:
             messages.error(request, f"Ошибка при удалении: {str(e)}")
             return redirect('article.archive')
-    
+
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user:
+            messages.error(request, "Вы не являетесь автором этой статьи.")
+            return redirect('article.index')
+        return super().dispatch(request, *args, **kwargs)
+
 class FileDownloadView(View):
     def get(self, request):
         file_path = os.path.join(settings.MEDIA_ROOT, 'sample.pdf')

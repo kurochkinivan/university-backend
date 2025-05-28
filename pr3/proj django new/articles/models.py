@@ -3,6 +3,7 @@ from slugify import slugify
 from django_ckeditor_5.fields import CKEditor5Field
 from django.utils.html import strip_tags 
 from django.urls import reverse
+from django.contrib.auth import get_user_model
 
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
@@ -64,6 +65,8 @@ class Article(TimeStampModel, SlugModel, SoftDeleteModel):
     featured_image = models.ImageField(blank=True, default="default.jpg", upload_to="images/", verbose_name="Изображение")
     tags = models.ManyToManyField(Tag, verbose_name="Теги")
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, verbose_name="Категория")
+    author = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, verbose_name="Автор")
+
 
     class Meta:
         ordering = ['-created_at']
